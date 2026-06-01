@@ -4,7 +4,7 @@ Tags: invoice, pdf invoice, invoice generator, billing, ubl
 Requires at least: 5.6
 Tested up to: 6.7
 Requires PHP: 7.2
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -19,6 +19,23 @@ Invovate Invoice Generator connects your WordPress site to the [Invovate invoice
 * **Free API key** — required for the invoice form (it generates a shareable PDF link). Get a free key at invovate.com/auth and set it under **Settings → Invovate**. The `invovate_generate()` helper can still compute JSON totals without one.
 
 Languages: English, Dutch, German, French, Spanish, Italian, Portuguese, Arabic, Japanese, Russian, Hindi. 20+ currencies, per-line tax, 5 templates.
+
+= Configure the form (shortcode options) =
+
+`[invovate_invoice_form]` accepts these attributes:
+
+* `fields` — comma list of inputs to show. Available: `from`, `to`, `items`, `currency`, `language`, `template`, `notes`. Items always show. Default: `from,to,items,currency,language`.
+* `from`, `to` — prefill (or, if not in `fields`, lock) the business and client name.
+* `currency` (default `USD`), `language` (default `en`), `template` (default `classic`).
+* `tax` — `true`/`false`: show the per-item Tax % field. Default `true`.
+* `qr` — `true`/`false`: embed a scan-to-view QR in the PDF. Default `true`.
+* `link` — `true`/`false`: `true` returns a 7-day shareable link; `false` returns a direct PDF download. Default `true`.
+* `rows` — number of starting line-item rows. Default `1` (an "Add item" button is always shown).
+* `button` — submit-button label.
+
+Examples:
+`[invovate_invoice_form fields="to,items" from="Acme Studio" currency="EUR" language="de" template="navy" qr="false"]`
+`[invovate_invoice_form link="false" button="Download invoice"]`
 
 **Not regulated e-invoicing.** PDF/UBL output is for interoperability and archival only — it does not provide Peppol, Factur-X, ZUGFeRD, XRechnung, or NF-e compliance or government-network delivery.
 
@@ -41,6 +58,10 @@ Invoice data is sent to the Invovate API over HTTPS. Shareable PDF links are sto
 No. It generates invoice documents but is not a Peppol/Factur-X/XRechnung/NF-e transmission service.
 
 == Changelog ==
+
+= 0.2.0 =
+* Configurable shortcode: `fields`, `from`/`to` defaults, `currency`/`language`/`template`, `tax`, `qr` (toggle the scan-to-view QR), `link` (shareable link vs direct PDF download), `rows`, `button`.
+* "Add item" button for multiple line items; direct-download mode; notes field.
 
 = 0.1.0 =
 * Initial release: settings page, `[invovate_invoice_form]` shortcode, and `invovate_generate()` helper.
