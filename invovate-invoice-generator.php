@@ -123,9 +123,10 @@ function invovate_render_settings_page() {
 						<input type="password" id="invovate_api_key" name="<?php echo esc_attr( INVOVATE_OPT_KEY ); ?>"
 							value="<?php echo esc_attr( get_option( INVOVATE_OPT_KEY, '' ) ); ?>" class="regular-text" autocomplete="off" />
 						<p class="description">
-							Optional. Free key (starts with <code>inv_</code>) from
+							<strong>Required for the invoice form.</strong> Free key (starts with <code>inv_</code>) from
 							<a href="https://invovate.com/auth" target="_blank" rel="noopener">invovate.com/auth</a>.
-							JSON totals and PDF hosted-links work without one; direct PDF/UBL output needs it.
+							The <code>[invovate_invoice_form]</code> shortcode generates a shareable PDF link, which needs a key.
+							(The <code>invovate_generate()</code> helper can still compute JSON totals without one.)
 						</p>
 					</td>
 				</tr>
