@@ -3,7 +3,7 @@
  * Plugin Name:       Invovate Invoice Generator
  * Plugin URI:        https://invovate.com/api
  * Description:        Generate PDF invoices in 11 languages via the Invovate API. Adds a configurable [invovate_invoice_form] shortcode and a reusable helper for themes/plugins.
- * Version:           0.2.0
+ * Version:           0.4.2
  * Requires at least: 5.6
  * Requires PHP:      7.2
  * Author:            Invovate
@@ -21,13 +21,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'INVOVATE_API_URL', 'https://invovate.com/api/generate-invoice' );
 define( 'INVOVATE_OPT_KEY', 'invovate_api_key' );
+define( 'INVOVATE_VER', '0.4.2' );
+
+/**
+ * Register the front-end form script. It is ENQUEUED (never inlined into the
+ * shortcode HTML) because WordPress content filters mangle inline <script> that
+ * contains `&&` next to `<`/`>` (turning `&&` into `&#038;&#038;`).
+ */
+add_action( 'wp_enqueue_scripts', function () {
+	wp_register_script( 'invovate-form', plugins_url( 'assets/invovate-form.js', __FILE__ ), array(), INVOVATE_VER, true );
+	wp_localize_script( 'invovate-form', 'INVOVATE_CFG', array( 'ajax' => admin_url( 'admin-ajax.php' ) ) );
+} );
 
 /**
  * Core client: send an invoice payload to the Invovate API.
  * Returns array on success, or WP_Error on failure.
  *
  * @param array $invoice  Invoice fields (from, to, items, currency, language, features, …).
- * @param array $args     Optional: ['output' => 'json'|'pdf'|'ubl', 'hosted_link' => bool].
+ * @param array $args     Optional: ['output' => 'json'|'pdf'|'ubl', 'hosted_link' => bool,
+ *                         'api_key' => string (override the saved option, e.g. for a validity check)].
  * @return array|WP_Error
  */
 function invovate_generate( $invoice, $args = array() ) {
@@ -43,8 +55,9 @@ function invovate_generate( $invoice, $args = array() ) {
 		);
 	}
 
-	$headers = array( 'Content-Type' => 'application/json' );
-	$key     = trim( (string) get_option( INVOVATE_OPT_KEY, '' ) );
+	$headers  = array( 'Content-Type' => 'application/json' );
+	$override = isset( $args['api_key'] ) ? trim( (string) $args['api_key'] ) : '';
+	$key      = '' !== $override ? $override : trim( (string) get_option( INVOVATE_OPT_KEY, '' ) );
 	if ( '' !== $key ) {
 		$headers['Authorization'] = 'Bearer ' . $key;
 	}
@@ -116,30 +129,72 @@ function invovate_render_settings_page() {
 					<td>
 						<input type="password" id="invovate_api_key" name="<?php echo esc_attr( INVOVATE_OPT_KEY ); ?>"
 							value="<?php echo esc_attr( get_option( INVOVATE_OPT_KEY, '' ) ); ?>" class="regular-text" autocomplete="off" />
+						<button type="button" class="button button-secondary" id="invovate-check-btn" style="margin-left:.4rem;">Check key</button>
+						<span id="invovate-check-result" style="margin-left:.6rem;font-weight:600;"></span>
 						<p class="description">
 							<strong>Required for the invoice form.</strong> Free key (starts with <code>inv_</code>) from
 							<a href="https://invovate.com/auth" target="_blank" rel="noopener">invovate.com/auth</a>.
 							The <code>[invovate_invoice_form]</code> shortcode generates a shareable PDF link, which needs a key.
 							(The <code>invovate_generate()</code> helper can still compute JSON totals without one.)
+							<br /><strong>Check key</strong> validates the value above against the Invovate API from this server.
+							On <a href="https://playground.wordpress.net" target="_blank" rel="noopener">WordPress&nbsp;Playground</a> it can report a failure even for a valid key —
+							its in-browser proxy strips the <code>Authorization</code> header; test on a real host.
 						</p>
 					</td>
 				</tr>
 			</table>
 			<?php submit_button(); ?>
 		</form>
+
+		<script>
+		(function () {
+			var btn = document.getElementById('invovate-check-btn');
+			var out = document.getElementById('invovate-check-result');
+			var inp = document.getElementById('invovate_api_key');
+			if ( ! btn ) { return; }
+			btn.addEventListener('click', function () {
+				out.style.color = '#646970'; out.textContent = 'Checking…'; btn.disabled = true;
+				var fd = new FormData();
+				fd.append('action', 'invovate_test_key');
+				fd.append('_nonce', <?php echo wp_json_encode( wp_create_nonce( 'invovate_test_key' ) ); ?>);
+				fd.append('key', inp ? inp.value : '');
+				fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method: 'POST', body: fd, credentials: 'same-origin' })
+					.then(function (r) { return r.json(); })
+					.then(function (j) {
+						btn.disabled = false;
+						if ( j && j.success ) {
+							out.style.color = '#1a7f37';
+							out.textContent = '✓ ' + ( ( j.data && j.data.message ) || 'API key is valid.' );
+						} else {
+							out.style.color = '#b32d2e';
+							out.textContent = '✗ ' + ( ( j.data && j.data.message ) || 'Check failed.' );
+						}
+					})
+					.catch(function () {
+						btn.disabled = false; out.style.color = '#b32d2e'; out.textContent = '✗ Network error.';
+					});
+			});
+		})();
+		</script>
+
 		<hr />
 		<h2>Shortcode</h2>
 		<p>Basic: <code>[invovate_invoice_form]</code></p>
 		<p>All options (with defaults):</p>
-		<pre style="background:#f6f7f7;padding:10px;overflow:auto;">[invovate_invoice_form
-  fields="from,to,items,currency,language"   <?php echo esc_html( 'which inputs to show (also: template, notes; items always shown)' ); ?>
-  from="" to=""                              <?php echo esc_html( 'prefill / lock the business + client name' ); ?>
+		<pre style="background:#f6f7f7;padding:10px;max-width:100%;overflow-x:auto;box-sizing:border-box;white-space:pre;">[invovate_invoice_form
+  fields="from,to,items,currency,language,qr,link"
+  from="" to=""
   currency="USD" language="en" template="classic"
-  tax="true"                                 <?php echo esc_html( 'show the per-item Tax % field' ); ?>
-  qr="true"                                  <?php echo esc_html( 'embed a scan-to-view QR in the PDF' ); ?>
-  link="true"                                <?php echo esc_html( 'true = show a 7-day shareable link; false = direct PDF download' ); ?>
-  rows="1"                                   <?php echo esc_html( 'number of starting line-item rows' ); ?>
-  button="Generate PDF"]</pre>
+  tax="true"   rows="1"   button="Generate PDF"
+  qr="true"    link="true"]</pre>
+		<table class="form-table" role="presentation" style="max-width:100%;">
+			<tr><th scope="row" style="width:90px;">fields</th><td>Which inputs to show. Options: <code>from, to, items, currency, language, template, notes, qr, link</code> (the items table always shows). Add <code>qr</code> / <code>link</code> to let users toggle them on the form.</td></tr>
+			<tr><th scope="row">from / to</th><td>Prefill (or, if not in <code>fields</code>, lock) the business + client name.</td></tr>
+			<tr><th scope="row">tax</th><td><code>true</code> shows the per-item Tax&nbsp;% field.</td></tr>
+			<tr><th scope="row">qr</th><td>Default for the scan-to-view QR in the PDF (<code>true</code>/<code>false</code>).</td></tr>
+			<tr><th scope="row">link</th><td><code>true</code> = a 7-day shareable link; <code>false</code> = direct PDF download.</td></tr>
+			<tr><th scope="row">rows / button</th><td>Number of starting line-item rows; the submit button label.</td></tr>
+		</table>
 		<p>Or call <code>invovate_generate( $invoice, [ 'output' =&gt; 'pdf' ] )</code> from your theme/plugin.</p>
 		<p style="color:#666;font-size:12px;">Not a regulated e-invoicing service (no Peppol/Factur-X/XRechnung/NF-e).</p>
 	</div>
@@ -153,7 +208,7 @@ function invovate_render_settings_page() {
 add_shortcode( 'invovate_invoice_form', function ( $atts ) {
 	$a = shortcode_atts(
 		array(
-			'fields'   => 'from,to,items,currency,language',
+			'fields'   => 'from,to,items,currency,language,qr,link',
 			'from'     => '',
 			'to'       => '',
 			'currency' => 'USD',
@@ -183,23 +238,22 @@ add_shortcode( 'invovate_invoice_form', function ( $atts ) {
 	$tpl   = in_array( $a['template'], $tpls, true ) ? $a['template'] : 'classic';
 	$lang  = in_array( $a['language'], $langs, true ) ? $a['language'] : 'en';
 	$nonce = wp_create_nonce( 'invovate_generate' );
-	$ajax  = esc_url( admin_url( 'admin-ajax.php' ) );
+	$grid  = $show_tax ? '2fr 1fr 1fr 1fr' : '2fr 1fr 1fr';
 
-	// One item row (reused by the "Add item" button). Static HTML, no user input.
-	$grid     = $show_tax ? '2fr 1fr 1fr 1fr' : '2fr 1fr 1fr';
-	$row_html = '<div class="inv-item" style="display:grid;grid-template-columns:' . $grid . ';gap:.4rem;">'
-		. '<input type="text" class="d" placeholder="Description" />'
-		. '<input type="number" class="q" placeholder="Qty" value="1" step="any" />'
-		. '<input type="number" class="p" placeholder="Unit price" step="any" />'
-		. ( $show_tax ? '<input type="number" class="t" placeholder="Tax %" step="any" />' : '' )
-		. '</div>';
+	wp_enqueue_script( 'invovate-form' ); // loaded in the footer; never inlined
 
 	ob_start();
 	?>
+	<style>
+	.invovate-form{max-width:560px;width:100%;box-sizing:border-box}
+	.invovate-form input,.invovate-form select,.invovate-form textarea{box-sizing:border-box;max-width:100%;min-width:0}
+	.invovate-form .inv-item,.invovate-form .inv-item>*{min-width:0}
+	</style>
 	<form class="invovate-form" onsubmit="return false;"
 		data-qr="<?php echo esc_attr( $qr_flag ); ?>" data-link="<?php echo esc_attr( $link_flag ); ?>"
+		data-tax="<?php echo esc_attr( $show_tax ? 1 : 0 ); ?>"
 		data-template="<?php echo esc_attr( $tpl ); ?>"
-		style="max-width:560px;display:grid;gap:.6rem;">
+		style="display:grid;gap:.6rem;">
 		<input type="hidden" class="inv-nonce" value="<?php echo esc_attr( $nonce ); ?>" />
 
 		<?php if ( $has( 'from' ) ) : ?>
@@ -256,73 +310,28 @@ add_shortcode( 'invovate_invoice_form', function ( $atts ) {
 			<textarea class="inv-notes" placeholder="Notes (optional)" rows="2"></textarea>
 		<?php endif; ?>
 
+		<?php if ( $has( 'link' ) || $has( 'qr' ) ) : ?>
+			<div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:.9rem;">
+				<?php if ( $has( 'link' ) ) : ?>
+					<label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;">
+						<input type="checkbox" class="inv-link" <?php checked( $link_flag, 1 ); ?> /> Shareable 7-day link <span style="color:#777;">(off = direct PDF download)</span>
+					</label>
+				<?php endif; ?>
+				<?php if ( $has( 'qr' ) ) : ?>
+					<label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;">
+						<input type="checkbox" class="inv-qr" <?php checked( $qr_flag, 1 ); ?> /> Add scan-to-view QR
+					</label>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
+
 		<button type="submit" class="inv-go"><?php echo esc_html( $a['button'] ); ?></button>
 		<div class="inv-result" style="font-size:.95rem;"></div>
 	</form>
-	<script>
-	(function () {
-		var ajax = <?php echo wp_json_encode( $ajax ); ?>;
-		var ROW  = <?php echo wp_json_encode( $row_html ); ?>;
-		document.querySelectorAll('.invovate-form').forEach(function (form) {
-			var add = form.querySelector('.inv-add');
-			if (add) add.addEventListener('click', function () {
-				var tmp = document.createElement('div'); tmp.innerHTML = ROW;
-				form.querySelector('.inv-items').appendChild(tmp.firstChild);
-			});
-			form.querySelector('.inv-go').addEventListener('click', function () {
-				var res = form.querySelector('.inv-result');
-				res.textContent = 'Generating…';
-				var items = Array.prototype.map.call(form.querySelectorAll('.inv-item'), function (row) {
-					var t = row.querySelector('.t');
-					var o = {
-						description: (row.querySelector('.d') || {}).value || '',
-						quantity: parseFloat((row.querySelector('.q') || {}).value) || 1,
-						unit_price: parseFloat((row.querySelector('.p') || {}).value) || 0
-					};
-					if (t && parseFloat(t.value)) o.tax_rate = parseFloat(t.value);
-					return o;
-				}).filter(function (i) { return i.description; });
-
-				var pick = function (sel) { var el = form.querySelector(sel); return el ? el.value : ''; };
-				var fd = new FormData();
-				fd.append('action', 'invovate_generate');
-				fd.append('_nonce', pick('.inv-nonce'));
-				fd.append('from', pick('.inv-from'));
-				fd.append('to', pick('.inv-to'));
-				fd.append('currency', pick('.inv-currency') || 'USD');
-				fd.append('language', pick('.inv-language') || 'en');
-				fd.append('template', form.querySelector('.inv-template') ? pick('.inv-template') : form.dataset.template);
-				if (form.querySelector('.inv-notes')) fd.append('notes', pick('.inv-notes'));
-				fd.append('items', JSON.stringify(items));
-				fd.append('qr', form.dataset.qr);
-				fd.append('link', form.dataset.link);
-
-				fetch(ajax, { method: 'POST', body: fd, credentials: 'same-origin' })
-					.then(function (r) { return r.json(); })
-					.then(function (j) {
-						if (!j || !j.success || !j.data) {
-							res.textContent = '✗ ' + ((j && j.data && j.data.message) || 'Could not generate the invoice.');
-							return;
-						}
-						if (j.data.pdf_base64) {
-							var bin = atob(j.data.pdf_base64), arr = new Uint8Array(bin.length);
-							for (var k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
-							var url = URL.createObjectURL(new Blob([arr], { type: 'application/pdf' }));
-							var a = document.createElement('a'); a.href = url; a.download = j.data.filename || 'invoice.pdf';
-							document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-							res.textContent = '✓ PDF downloaded.';
-						} else if (j.data.hosted_url) {
-							res.innerHTML = '✓ <a href="' + j.data.hosted_url + '" target="_blank" rel="noopener">Download your invoice PDF</a> (link valid 7 days)';
-						} else {
-							res.textContent = '✓ Done.';
-						}
-					})
-					.catch(function () { res.textContent = '✗ Network error.'; });
-			});
-		});
-	})();
-	</script>
 	<?php
+	// All behaviour lives in the enqueued assets/invovate-form.js (see top of file
+	// for why it is NOT inlined). Initial rows are server-rendered above; the
+	// script reads data-* attributes + the nonce hidden input.
 	return ob_get_clean();
 } );
 
@@ -351,21 +360,33 @@ function invovate_ajax_generate() {
 		wp_send_json_error( array( 'message' => 'Please provide a business name, a client name, and at least one item.' ) );
 	}
 
-	$items = array();
+	$items        = array();
+	$missing_desc = false;
 	foreach ( $items_in as $it ) {
-		$desc = isset( $it['description'] ) ? sanitize_text_field( $it['description'] ) : '';
-		if ( '' === $desc ) {
+		$desc  = isset( $it['description'] ) ? sanitize_text_field( $it['description'] ) : '';
+		$qty   = isset( $it['quantity'] ) ? floatval( $it['quantity'] ) : 1;
+		$price = isset( $it['unit_price'] ) ? floatval( $it['unit_price'] ) : 0;
+		$tax   = ! empty( $it['tax_rate'] ) ? floatval( $it['tax_rate'] ) : 0;
+
+		// Skip a truly-empty row, but never silently drop a priced row.
+		if ( '' === $desc && 0.0 === $price ) {
 			continue;
 		}
-		$line = array(
-			'description' => $desc,
-			'quantity'    => isset( $it['quantity'] ) ? floatval( $it['quantity'] ) : 1,
-			'unit_price'  => isset( $it['unit_price'] ) ? floatval( $it['unit_price'] ) : 0,
-		);
-		if ( ! empty( $it['tax_rate'] ) ) {
-			$line['tax_rate'] = floatval( $it['tax_rate'] );
+		if ( '' === $desc ) {
+			$missing_desc = true;
+			continue;
+		}
+		if ( $qty < 0 || $price < 0 || $tax < 0 ) {
+			wp_send_json_error( array( 'message' => 'Quantity, unit price and tax must be positive numbers.' ) );
+		}
+		$line = array( 'description' => $desc, 'quantity' => $qty, 'unit_price' => $price );
+		if ( $tax > 0 ) {
+			$line['tax_rate'] = $tax;
 		}
 		$items[] = $line;
+	}
+	if ( $missing_desc ) {
+		wp_send_json_error( array( 'message' => 'Each item needs a description. Add one (or clear the empty row).' ) );
 	}
 	if ( empty( $items ) ) {
 		wp_send_json_error( array( 'message' => 'Please add at least one line item with a description.' ) );
@@ -413,3 +434,56 @@ function invovate_ajax_generate() {
 }
 add_action( 'wp_ajax_invovate_generate', 'invovate_ajax_generate' );
 add_action( 'wp_ajax_nopriv_invovate_generate', 'invovate_ajax_generate' );
+
+/* Admin-only: test that the saved key authenticates against the Invovate API. */
+function invovate_test_key() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => 'Permission denied.' ) );
+	}
+	check_ajax_referer( 'invovate_test_key', '_nonce' );
+
+	// Prefer the value typed in the box (lets you check before saving); fall back
+	// to the saved option.
+	$posted = isset( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : '';
+	$key    = '' !== $posted ? $posted : trim( (string) get_option( INVOVATE_OPT_KEY, '' ) );
+
+	if ( '' === $key ) {
+		wp_send_json_error( array( 'message' => 'No key to check. Paste your inv_ key in the box, then click Check key.' ) );
+	}
+	if ( 0 !== strpos( $key, 'inv_' ) ) {
+		wp_send_json_error( array( 'message' => 'That does not look like an Invovate key — it should start with "inv_".' ) );
+	}
+
+	// A minimal call on the SAME authenticated path the form uses (a shareable
+	// link requires auth — so this verifies the key authenticates end-to-end).
+	$invoice = array(
+		'from'     => array( 'name' => 'Connection Test' ),
+		'to'       => array( 'name' => 'Connection Test' ),
+		'currency' => 'USD',
+		'language' => 'en',
+		'template' => 'classic',
+		'items'    => array( array( 'description' => 'Test', 'quantity' => 1, 'unit_price' => 1 ) ),
+		'features' => array( 'hosted_link' => true ),
+	);
+	$result = invovate_generate( $invoice, array( 'output' => 'json', 'api_key' => $key ) );
+
+	if ( is_wp_error( $result ) ) {
+		$msg = $result->get_error_message();
+		// "auth_required" came back even though we sent a key → the header was
+		// stripped in transit (classic WordPress Playground proxy behaviour).
+		if ( false !== stripos( $msg, 'free API key' ) || false !== stripos( $msg, 'sign-in' ) ) {
+			$msg = 'The API received the request without the key (Authorization header was dropped in transit). '
+				. 'On WordPress Playground its proxy strips that header — test on a real host. Original: ' . $msg;
+		} elseif ( false !== stripos( $msg, 'invalid' ) || false !== stripos( $msg, 'unverified' ) ) {
+			$msg = 'Key rejected by the API: ' . $msg . ' Generate/confirm a key at invovate.com/auth.';
+		}
+		wp_send_json_error( array( 'message' => $msg ) );
+	}
+
+	$inv = isset( $result['invoice'] ) ? $result['invoice'] : $result;
+	if ( ! empty( $inv['hosted_url'] ) ) {
+		wp_send_json_success( array( 'message' => 'API key is valid — authenticated request succeeded.' ) );
+	}
+	wp_send_json_success( array( 'message' => 'Key accepted (JSON totals OK), but no shareable link was returned.' ) );
+}
+add_action( 'wp_ajax_invovate_test_key', 'invovate_test_key' );

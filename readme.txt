@@ -4,7 +4,7 @@ Tags: invoice, pdf invoice, invoice generator, billing, ubl
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 0.2.0
+Stable tag: 0.4.2
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -24,12 +24,12 @@ Languages: English, Dutch, German, French, Spanish, Italian, Portuguese, Arabic,
 
 `[invovate_invoice_form]` accepts these attributes:
 
-* `fields` — comma list of inputs to show. Available: `from`, `to`, `items`, `currency`, `language`, `template`, `notes`. Items always show. Default: `from,to,items,currency,language`.
+* `fields` — comma list of inputs/controls to show. Available: `from`, `to`, `items`, `currency`, `language`, `template`, `notes`, `qr`, `link`. Items always show. Default: `from,to,items,currency,language,qr,link`.
 * `from`, `to` — prefill (or, if not in `fields`, lock) the business and client name.
 * `currency` (default `USD`), `language` (default `en`), `template` (default `classic`).
 * `tax` — `true`/`false`: show the per-item Tax % field. Default `true`.
-* `qr` — `true`/`false`: embed a scan-to-view QR in the PDF. Default `true`.
-* `link` — `true`/`false`: `true` returns a 7-day shareable link; `false` returns a direct PDF download. Default `true`.
+* `qr` — default state of the scan-to-view QR (`true`/`false`). When `link` is in `fields`, users get a checkbox; the QR is disabled while the link is off (it points at the link). Default `true`.
+* `link` — default state of the shareable link (`true`/`false`): `true` = a 7-day shareable link; `false` = a direct PDF download with no link or QR. Default `true`.
 * `rows` — number of starting line-item rows. Default `1` (an "Add item" button is always shown).
 * `button` — submit-button label.
 
@@ -70,6 +70,21 @@ Invoice data is sent to the Invovate API over HTTPS. Shareable PDF links are sto
 No. It generates invoice documents but is not a Peppol/Factur-X/XRechnung/NF-e transmission service.
 
 == Changelog ==
+
+= 0.4.2 =
+* Turning off "Shareable 7-day link" now produces a clean direct-download PDF with no QR and no link (the scan-to-view QR points at the link, so it can't exist without one). The QR checkbox is disabled while the link is off.
+
+= 0.4.1 =
+* Fix: the "Generate PDF" button did nothing on some pages. The form script is now a properly enqueued file instead of inline markup — WordPress content filters were corrupting the inline JavaScript (encoding `&&` to `&#038;&#038;`), which broke the whole script.
+
+= 0.4.0 =
+* Form now shows QR + shareable-link toggle checkboxes (control them with `fields="...,qr,link"`; on by default).
+* Line items: a row with a price but no description is no longer silently dropped — it shows a clear error; truly-empty rows are skipped.
+* Negative quantity / unit price / tax are rejected with a clear message (matches the API).
+* Responsive form + settings: inputs and the shortcode example no longer overflow narrow screens.
+
+= 0.3.0 =
+* Settings → Invovate: added a "Test API key" button that runs a server-side authenticated call and reports whether the saved key reaches the API (with a hint for WordPress Playground, whose proxy strips the Authorization header).
 
 = 0.2.0 =
 * Configurable shortcode: `fields`, `from`/`to` defaults, `currency`/`language`/`template`, `tax`, `qr` (toggle the scan-to-view QR), `link` (shareable link vs direct PDF download), `rows`, `button`.
