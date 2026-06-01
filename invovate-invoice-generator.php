@@ -215,7 +215,14 @@ add_shortcode( 'invovate_invoice_form', function ( $atts ) {
 		<?php endif; ?>
 
 		<div class="inv-items" style="display:grid;gap:.4rem;">
-			<?php for ( $i = 0; $i < $rows; $i++ ) { echo $row_html; /* phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static markup */ } ?>
+			<?php for ( $i = 0; $i < $rows; $i++ ) : ?>
+				<div class="inv-item" style="display:grid;grid-template-columns:<?php echo esc_attr( $grid ); ?>;gap:.4rem;">
+					<input type="text" class="d" placeholder="Description" />
+					<input type="number" class="q" placeholder="Qty" value="1" step="any" />
+					<input type="number" class="p" placeholder="Unit price" step="any" />
+					<?php if ( $show_tax ) : ?><input type="number" class="t" placeholder="Tax %" step="any" /><?php endif; ?>
+				</div>
+			<?php endfor; ?>
 		</div>
 		<button type="button" class="inv-add" style="justify-self:start;font-size:.85rem;background:none;border:1px dashed #bbb;border-radius:6px;padding:.25rem .6rem;cursor:pointer;">+ Add item</button>
 
