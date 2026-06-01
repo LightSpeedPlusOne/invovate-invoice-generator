@@ -2,7 +2,7 @@
 Contributors: invovate
 Tags: invoice, pdf invoice, invoice generator, billing, ubl
 Requires at least: 5.6
-Tested up to: 6.7
+Tested up to: 7.0
 Requires PHP: 7.2
 Stable tag: 0.2.0
 License: MIT

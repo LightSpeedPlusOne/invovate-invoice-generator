@@ -331,7 +331,8 @@ function invovate_ajax_generate() {
 	$notes    = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
 	$qr       = isset( $_POST['qr'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['qr'] ) );
 	$link     = ! isset( $_POST['link'] ) || '0' !== sanitize_text_field( wp_unslash( $_POST['link'] ) ); // default true
-	$items_in = isset( $_POST['items'] ) ? json_decode( wp_unslash( $_POST['items'] ), true ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- JSON decoded + per-field sanitized below
+	$items_raw = isset( $_POST['items'] ) ? sanitize_text_field( wp_unslash( $_POST['items'] ) ) : '';
+	$items_in  = json_decode( $items_raw, true );
 
 	if ( '' === $from || '' === $to || ! is_array( $items_in ) || empty( $items_in ) ) {
 		wp_send_json_error( array( 'message' => 'Please provide a business name, a client name, and at least one item.' ) );
