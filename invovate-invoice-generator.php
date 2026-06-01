@@ -330,6 +330,12 @@ add_shortcode( 'invovate_invoice_form', function ( $atts ) {
 function invovate_ajax_generate() {
 	check_ajax_referer( 'invovate_generate', '_nonce' );
 
+	// The form always needs a key (shareable links AND direct PDFs require auth).
+	// Surface a clear, actionable message instead of the raw API "auth required" error.
+	if ( '' === trim( (string) get_option( INVOVATE_OPT_KEY, '' ) ) ) {
+		wp_send_json_error( array( 'message' => 'No Invovate API key is set. Add a free key under Settings → Invovate (and click Save Changes), then try again.' ) );
+	}
+
 	$from     = isset( $_POST['from'] ) ? sanitize_text_field( wp_unslash( $_POST['from'] ) ) : '';
 	$to       = isset( $_POST['to'] ) ? sanitize_text_field( wp_unslash( $_POST['to'] ) ) : '';
 	$currency = isset( $_POST['currency'] ) ? sanitize_text_field( wp_unslash( $_POST['currency'] ) ) : 'USD';

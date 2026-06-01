@@ -39,6 +39,18 @@ Examples:
 
 **Not regulated e-invoicing.** PDF/UBL output is for interoperability and archival only — it does not provide Peppol, Factur-X, ZUGFeRD, XRechnung, or NF-e compliance or government-network delivery.
 
+== External services ==
+
+This plugin connects to the **Invovate invoice API** to generate invoices. It is a first-party integration with a service operated by the plugin author.
+
+**What is sent, and when:** Only when you submit the `[invovate_invoice_form]` form (or call `invovate_generate()` in code), the invoice details you entered — business name, client name, line items (description, quantity, unit price, tax rate), currency, language, and optional notes — are sent over HTTPS to `https://invovate.com/api/generate-invoice`. If you set an API key under Settings → Invovate, it is sent as an `Authorization: Bearer` header. **Nothing is sent on page load or in the background.**
+
+**What is returned:** either a shareable PDF link (the invoice is stored for up to 7 days, then automatically deleted) or the generated PDF file.
+
+* Service & API docs: https://invovate.com/api
+* Terms of Service: https://invovate.com/terms
+* Privacy Policy: https://invovate.com/privacy
+
 == Installation ==
 
 1. Upload the `invovate-invoice-generator` folder to `/wp-content/plugins/`, or install the ZIP via Plugins → Add New → Upload.
