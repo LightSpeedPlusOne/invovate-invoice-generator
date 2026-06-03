@@ -33,9 +33,28 @@ Languages: English, Dutch, German, French, Spanish, Italian, Portuguese, Arabic,
 * `rows` — number of starting line-item rows. Default `1` (an "Add item" button is always shown).
 * `button` — submit-button label.
 
-Examples:
-`[invovate_invoice_form fields="to,items" from="Acme Studio" currency="EUR" language="de" template="navy" qr="false"]`
+= Example shortcodes (copy &amp; paste) =
+
+Basic form, all defaults:
+`[invovate_invoice_form]`
+
+Lock your business name; the client fills in the rest (EUR, German, navy template):
+`[invovate_invoice_form from="My Company GmbH" fields="to,items" currency="EUR" language="de" template="navy"]`
+
+Freelancer invoice in USD with a scan-to-view QR:
+`[invovate_invoice_form from="Jane Doe" currency="USD" qr="true"]`
+
+Direct PDF download instead of a 7-day shareable link:
 `[invovate_invoice_form link="false" button="Download invoice"]`
+
+Three starting rows, with the tax field and a notes box:
+`[invovate_invoice_form fields="from,to,items,currency,language,notes" rows="3" tax="true"]`
+
+Japanese invoice (JPY, consumption tax):
+`[invovate_invoice_form currency="JPY" language="ja" template="modern"]`
+
+Minimal — client name and items only:
+`[invovate_invoice_form fields="to,items" from="Acme Studio"]`
 
 **Not regulated e-invoicing.** PDF/UBL output is for interoperability and archival only — it does not provide Peppol, Factur-X, ZUGFeRD, XRechnung, or NF-e compliance or government-network delivery.
 
@@ -68,6 +87,18 @@ Invoice data is sent to the Invovate API over HTTPS. Shareable PDF links are sto
 
 = Is this regulated e-invoicing? =
 No. It generates invoice documents but is not a Peppol/Factur-X/XRechnung/NF-e transmission service.
+
+== Screenshots ==
+
+1. The [invovate_invoice_form] shortcode adds this invoice form to any page.
+2. English PDF invoice with your logo, QR code, 7-day shareable link and payment details.
+3. Japanese invoice (請求書) with consumption tax — 11 languages supported.
+4. Arabic right-to-left (RTL) invoice.
+5. German invoice (Rechnung) with VAT.
+6. Hindi invoice (GST) in Devanagari script.
+7. Russian invoice (НДС / VAT).
+8. French invoice (TVA).
+9. Dutch invoice (BTW).
 
 == Changelog ==
 
