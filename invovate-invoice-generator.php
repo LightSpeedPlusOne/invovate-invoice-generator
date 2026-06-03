@@ -3,7 +3,7 @@
  * Plugin Name:       Invovate Invoice Generator
  * Plugin URI:        https://invovate.com/api
  * Description:        Generate PDF invoices in 11 languages via the Invovate API. Adds a configurable [invovate_invoice_form] shortcode and a reusable helper for themes/plugins.
- * Version:           0.4.2
+ * Version:           0.4.3
  * Requires at least: 5.6
  * Requires PHP:      7.2
  * Author:            Invovate
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'INVOVATE_API_URL', 'https://invovate.com/api/generate-invoice' );
 define( 'INVOVATE_OPT_KEY', 'invovate_api_key' );
-define( 'INVOVATE_VER', '0.4.2' );
+define( 'INVOVATE_VER', '0.4.3' );
 
 /**
  * Register the front-end form script. It is ENQUEUED (never inlined into the
@@ -31,6 +31,22 @@ define( 'INVOVATE_VER', '0.4.2' );
 add_action( 'wp_enqueue_scripts', function () {
 	wp_register_script( 'invovate-form', plugins_url( 'assets/invovate-form.js', __FILE__ ), array(), INVOVATE_VER, true );
 	wp_localize_script( 'invovate-form', 'INVOVATE_CFG', array( 'ajax' => admin_url( 'admin-ajax.php' ) ) );
+	wp_register_style( 'invovate-form', plugins_url( 'assets/invovate-form.css', __FILE__ ), array(), INVOVATE_VER );
+} );
+
+/**
+ * Admin: enqueue the settings-page "Check key" script (only on our options page),
+ * instead of inlining a <script> tag.
+ */
+add_action( 'admin_enqueue_scripts', function ( $hook ) {
+	if ( 'settings_page_invovate-settings' !== $hook ) {
+		return;
+	}
+	wp_enqueue_script( 'invovate-admin', plugins_url( 'assets/invovate-admin.js', __FILE__ ), array(), INVOVATE_VER, true );
+	wp_localize_script( 'invovate-admin', 'INVOVATE_ADMIN', array(
+		'ajax'  => admin_url( 'admin-ajax.php' ),
+		'nonce' => wp_create_nonce( 'invovate_test_key' ),
+	) );
 } );
 
 /**
@@ -146,37 +162,6 @@ function invovate_render_settings_page() {
 			<?php submit_button(); ?>
 		</form>
 
-		<script>
-		(function () {
-			var btn = document.getElementById('invovate-check-btn');
-			var out = document.getElementById('invovate-check-result');
-			var inp = document.getElementById('invovate_api_key');
-			if ( ! btn ) { return; }
-			btn.addEventListener('click', function () {
-				out.style.color = '#646970'; out.textContent = 'Checking…'; btn.disabled = true;
-				var fd = new FormData();
-				fd.append('action', 'invovate_test_key');
-				fd.append('_nonce', <?php echo wp_json_encode( wp_create_nonce( 'invovate_test_key' ) ); ?>);
-				fd.append('key', inp ? inp.value : '');
-				fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method: 'POST', body: fd, credentials: 'same-origin' })
-					.then(function (r) { return r.json(); })
-					.then(function (j) {
-						btn.disabled = false;
-						if ( j && j.success ) {
-							out.style.color = '#1a7f37';
-							out.textContent = '✓ ' + ( ( j.data && j.data.message ) || 'API key is valid.' );
-						} else {
-							out.style.color = '#b32d2e';
-							out.textContent = '✗ ' + ( ( j.data && j.data.message ) || 'Check failed.' );
-						}
-					})
-					.catch(function () {
-						btn.disabled = false; out.style.color = '#b32d2e'; out.textContent = '✗ Network error.';
-					});
-			});
-		})();
-		</script>
-
 		<hr />
 		<h2>Shortcode</h2>
 		<p>Basic: <code>[invovate_invoice_form]</code></p>
@@ -241,19 +226,14 @@ add_shortcode( 'invovate_invoice_form', function ( $atts ) {
 	$grid  = $show_tax ? '2fr 1fr 1fr 1fr' : '2fr 1fr 1fr';
 
 	wp_enqueue_script( 'invovate-form' ); // loaded in the footer; never inlined
+	wp_enqueue_style( 'invovate-form' );  // assets/invovate-form.css (not inlined)
 
 	ob_start();
 	?>
-	<style>
-	.invovate-form{max-width:560px;width:100%;box-sizing:border-box}
-	.invovate-form input,.invovate-form select,.invovate-form textarea{box-sizing:border-box;max-width:100%;min-width:0}
-	.invovate-form .inv-item,.invovate-form .inv-item>*{min-width:0}
-	</style>
 	<form class="invovate-form" onsubmit="return false;"
 		data-qr="<?php echo esc_attr( $qr_flag ); ?>" data-link="<?php echo esc_attr( $link_flag ); ?>"
 		data-tax="<?php echo esc_attr( $show_tax ? 1 : 0 ); ?>"
-		data-template="<?php echo esc_attr( $tpl ); ?>"
-		style="display:grid;gap:.6rem;">
+		data-template="<?php echo esc_attr( $tpl ); ?>">
 		<input type="hidden" class="inv-nonce" value="<?php echo esc_attr( $nonce ); ?>" />
 
 		<?php if ( $has( 'from' ) ) : ?>

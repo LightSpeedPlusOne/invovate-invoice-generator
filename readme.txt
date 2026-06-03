@@ -1,10 +1,10 @@
 === Invovate Invoice Generator ===
-Contributors: invovate
+Contributors: lightspeedplusone
 Tags: invoice, pdf invoice, invoice generator, billing, ubl
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 0.4.2
+Stable tag: 0.4.3
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -70,6 +70,10 @@ Invoice data is sent to the Invovate API over HTTPS. Shareable PDF links are sto
 No. It generates invoice documents but is not a Peppol/Factur-X/XRechnung/NF-e transmission service.
 
 == Changelog ==
+
+= 0.4.3 =
+* Enqueue the admin "Check key" script and the form CSS via wp_enqueue_* instead of inline <script>/<style> tags (per plugin guidelines).
+* readme: set Contributors to the correct WordPress.org username.
 
 = 0.4.2 =
 * Turning off "Shareable 7-day link" now produces a clean direct-download PDF with no QR and no link (the scan-to-view QR points at the link, so it can't exist without one). The QR checkbox is disabled while the link is off.

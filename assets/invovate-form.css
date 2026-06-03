@@ -1,0 +1,4 @@
+/* Invovate Invoice Generator — front-end form layout (enqueued, not inlined). */
+.invovate-form{max-width:560px;width:100%;box-sizing:border-box;display:grid;gap:.6rem}
+.invovate-form input,.invovate-form select,.invovate-form textarea{box-sizing:border-box;max-width:100%;min-width:0}
+.invovate-form .inv-item,.invovate-form .inv-item>*{min-width:0}
